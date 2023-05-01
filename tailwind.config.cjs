@@ -1,6 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 const config = {
-  content: ["./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: 'class',
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    './node_modules/tailwind-component-library/**/*.{js,ts,jsx,tsx}',
+  ],
   theme: {
     extend: {},
   },

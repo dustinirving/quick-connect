@@ -5,9 +5,12 @@ import {
   type DefaultSession,
 } from "next-auth";
 import GoogleProvider from 'next-auth/providers/google'
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
+import { compare } from "bcrypt";
+import { TRPCError } from "@trpc/server";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -36,17 +39,40 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions: NextAuthOptions = {
-  callbacks: {
-    session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-        // session.user.role = user.role; <-- put other properties on the session here
-      }
-      return session;
-    },
-  },
   adapter: PrismaAdapter(prisma),
   providers: [
+    CredentialsProvider({
+      async authorize(credentials) {
+        const user = await prisma.user.findUnique({ where: { email: credentials?.email } });
+
+        if (!user) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid email or password',
+          });
+        }
+
+        let isValid = false
+
+        if (credentials?.password && user.password) {
+          isValid = await compare(credentials.password, user.password)
+        }
+
+        if (!isValid) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid email or password',
+          });
+        }
+
+        console.log(user)
+        return user
+      },
+      credentials: {
+        email: { label: "Email", type: "email", placeholder: "jsmith@gmail.com" },
+        password: { label: "Password", type: "password" }
+      },
+    }),
     GoogleProvider({
       clientId: env.GOOGLE_CLIENT_ID,
       clientSecret: env.GOOGLE_CLIENT_SECRET,
@@ -61,6 +87,12 @@ export const authOptions: NextAuthOptions = {
      * @see https://next-auth.js.org/providers/github
      */
   ],
+  pages: {
+    signIn: '/',
+  },
+  session: {
+    strategy: "jwt",
+  }
 };
 
 /**
