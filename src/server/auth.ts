@@ -65,7 +65,6 @@ export const authOptions: NextAuthOptions = {
           });
         }
 
-        console.log(user)
         return user
       },
       credentials: {
